@@ -628,7 +628,10 @@ class CAR(Platforms):
   KIA_K8_HEV_1ST_GEN = HyundaiCanFDPlatformConfig(
     [HyundaiCarDocs("Kia K8 Hybrid (with HDA II) 2023", "Highway Driving Assist II", car_parts=CarParts.common([CarHarness.hyundai_q]))],
     # mass: https://carprices.ae/brands/kia/2023/k8/1.6-turbo-hybrid, steerRatio: guesstimate from K5 platform
-    CarSpecs(mass=1630, wheelbase=2.895, steerRatio=13.27)
+    CarSpecs(mass=1630, wheelbase=2.895, steerRatio=13.27),
+    # 2026 K8 HEV (GL3 PE) rlog: CAM bus publishes the 0xCB angle command at 100 Hz.
+    # The ADAS 18-pin harness exposes E-CAN/A-CAN/CAM on buses 0/1/2 respectively.
+    flags=HyundaiFlags.CANFD_ANGLE_STEERING,
   )
   KIA_NIRO_EV = HyundaiPlatformConfig(
     [
