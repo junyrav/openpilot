@@ -275,15 +275,34 @@ static bool hyundai_canfd_tx_hook(const CANPacket_t *msg) {
 
       // ADAS_ACIAnglTqRedcGainVal: bit 96, 8 bits, unsigned. Raw 0-250 valid, 251-255 reserved.
       const uint8_t gain_raw = msg->data[12];
-      bool gain_violation = gain_raw > 250U;
-      if (!steer_angle_req && (gain_raw != 0U)) {
-        gain_violation = true;
+
+      // LFA-steering angle trims (e.g. 2026 K8 HEV PE) actuate through ADAS_CMD_35 (0xCB) and only need the
+      // stock-style LFA frame as a status companion. That companion carries no actuation at all: angle-active
+      // field 0, zero angle, zero gain, zero torque and no steer request. Accept it without running it through
+      // the angle checks, otherwise it double-counts against the 0xCB real-time rate limit and resets the
+      // desired-angle tracking. Anything that carries actuation still goes through the full checks below.
+      const int lfa_torque = (((msg->data[6] & 0xFU) << 7U) | (msg->data[5] >> 1U)) - 1024U;
+      const bool lfa_steer_req = GET_BIT(msg, 52U);
+      const bool lfa_status_companion = !hyundai_canfd_lka_steering && (steer_addr == 0x12aU) &&
+                                        (lkas_angle_active == 0) && (desired_angle == 0) && (gain_raw == 0U) &&
+                                        (lfa_torque == 0) && !lfa_steer_req;
+
+      // Angle-steering platforms never actuate through the LFA torque fields.
+      if ((steer_addr == 0x12aU) && ((lfa_torque != 0) || lfa_steer_req)) {
+        tx = false;
       }
 
-      if (steer_angle_cmd_checks_vm(desired_angle, steer_angle_req,
-                                    HYUNDAI_CANFD_ANGLE_STEERING_LIMITS,
-                                    HYUNDAI_CANFD_ANGLE_STEERING_PARAMS) || gain_violation) {
-        tx = false;
+      if (!lfa_status_companion) {
+        bool gain_violation = gain_raw > 250U;
+        if (!steer_angle_req && (gain_raw != 0U)) {
+          gain_violation = true;
+        }
+
+        if (steer_angle_cmd_checks_vm(desired_angle, steer_angle_req,
+                                      HYUNDAI_CANFD_ANGLE_STEERING_LIMITS,
+                                      HYUNDAI_CANFD_ANGLE_STEERING_PARAMS) || gain_violation) {
+          tx = false;
+        }
       }
     } else {
       int desired_torque = (((msg->data[6] & 0xFU) << 7U) | (msg->data[5] >> 1U)) - 1024U;

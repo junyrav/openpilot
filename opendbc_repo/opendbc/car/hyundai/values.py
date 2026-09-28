@@ -628,7 +628,14 @@ class CAR(Platforms):
   KIA_K8_HEV_1ST_GEN = HyundaiCanFDPlatformConfig(
     [HyundaiCarDocs("Kia K8 Hybrid (with HDA II) 2023", "Highway Driving Assist II", car_parts=CarParts.common([CarHarness.hyundai_q]))],
     # mass: https://carprices.ae/brands/kia/2023/k8/1.6-turbo-hybrid, steerRatio: guesstimate from K5 platform
-    CarSpecs(mass=1630, wheelbase=2.895, steerRatio=13.27)
+    CarSpecs(mass=1630, wheelbase=2.895, steerRatio=13.27),
+    # K8-HEV-PE branch: tuned for the 2026 K8 Hybrid facelift (GL3 PE) with HDA II / LFA2.
+    # This trim steers by angle through ADAS_CMD_35_10ms (0xCB, 24 B, 100 Hz) on E-CAN, like its
+    # platform sibling HYUNDAI_AZERA_HEV_7TH_GEN. With the ADAS 18-pin harness the layout is
+    # E-CAN=0, A-CAN=1 (camera LKAS_ALT 0x110 lives here), ADRV=2 (0xCB, LFA 0x12A, SCC_CONTROL 0x1A0),
+    # which the fingerprint auto-detects as LFA steering + camera SCC. NOTE: pre-facelift torque-steer
+    # K8s must NOT run this branch. HYBRID is detected at runtime from 0xFA on E-CAN.
+    flags=HyundaiFlags.CANFD_ANGLE_STEERING,
   )
   KIA_NIRO_EV = HyundaiPlatformConfig(
     [

@@ -2,6 +2,7 @@ import time
 # Provenance: portions of HKG angle integration are adapted from sunnypilot/opendbc's
 # hkg-angle-steering-2025 branch at cc4b08625. See CREDITS.md and THIRD_PARTY_NOTICES.md.
 from opendbc.car import get_safety_config, structs, uds
+from opendbc.car.carlog import carlog
 from opendbc.car.hyundai import hyundaicanfd
 from opendbc.car.hyundai.hyundaicanfd import CanBus
 from opendbc.car.hyundai.values import HyundaiFlags, CAR, CarControllerParams, \
@@ -139,6 +140,11 @@ class CarInterface(CarInterfaceBase):
       lka_steering = Ecu.adas in [fw.ecu for fw in car_fw] or 0x50 in fingerprint[cam_can]
       if lka_steering:
         ret.flags |= HyundaiFlags.CANFD_LKA_STEERING.value
+    if candidate == CAR.KIA_K8_HEV_1ST_GEN and lka_steering:
+      # K8-HEV-PE branch expects the ADAS 18-pin layout (E-CAN=0, A-CAN=1, ADRV=2) where the camera's
+      # LKAS_ALT (0x110) is only on A-CAN. Seeing it on bus 2 means a different harness/tap point; keep
+      # stock detection (openpilot long stays unavailable) and leave a breadcrumb in the logs.
+      carlog.error({"event": "K8 PE: unexpected LKA steering layout", "bus2_has_0x110": 0x110 in fingerprint[cam_can]})
     CAN = CanBus(None, fingerprint, lka_steering)
 
     if ret.flags & HyundaiFlags.CANFD:

@@ -36,6 +36,7 @@ from openpilot.system.athena.registration import register, UNREGISTERED_DONGLE_I
 from openpilot.common.swaglog import cloudlog, add_file_handler
 from openpilot.system.version import get_build_metadata, terms_version, training_version
 from openpilot.system.hardware.hw import Paths
+from openpilot.starpilot.system.k8_pe_defaults import apply_k8_pe_defaults
 
 _MANAGER_CORE_IMPORT_DONE = time.monotonic()
 
@@ -1026,6 +1027,7 @@ def manager_init() -> None:
   migrate_cluster_offset_default(params, params_cache)
   migrate_traffic_mode_smooth_defaults(params, params_cache)
   migrate_traffic_follow_default(params, params_cache)
+  apply_k8_pe_defaults(params)
   last_timing = _log_boot_timing("manager_init", "starpilot_migrations", manager_init_start, last_timing)
 
   # set unset params to their default value

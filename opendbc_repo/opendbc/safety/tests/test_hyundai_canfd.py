@@ -466,6 +466,59 @@ class TestHyundaiCanfdAltButtonFlagIsolation(unittest.TestCase):
     self.assertTrue(self.safety.get_lkas_on())
 
 
+class TestHyundaiCanfdLfaAngleCompanion(unittest.TestCase):
+  """LFA-steering angle trims (2026 K8 HEV PE): 0xCB carries the angle, 0x12A is a no-actuation companion."""
+  TX_MSGS = []
+  SPEED_KPH = 72.
+
+  def setUp(self):
+    self.packer = CANPackerSafety("hyundai_canfd_generated")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_safety_hooks(CarParams.SafetyModel.hyundaiCanfd,
+                                 HyundaiSafetyFlags.CANFD_ANGLE_STEERING | HyundaiSafetyFlags.CAMERA_SCC |
+                                 HyundaiSafetyFlags.HYBRID_GAS | HyundaiSafetyFlags.LONG)
+    self.safety.init_tests()
+    for _ in range(common.MAX_SAMPLE_VALS):
+      self.safety.safety_rx_hook(self.packer.make_can_msg_safety("WHEEL_SPEEDS", 0, {f"WHL_Spd{p}Val": self.SPEED_KPH
+                                                                                     for p in ["FL", "FR", "RL", "RR"]}))
+      self.safety.safety_rx_hook(self.packer.make_can_msg_safety("MDPS", 0, {"STEERING_ANGLE": 0.}))
+
+  def _companion(self, **overrides):
+    values = {"LKA_MODE": 2, "LKA_ICON": 2, "TORQUE_REQUEST": 0, "STEER_REQ": 0, "DAMP_FACTOR": 100}
+    values.update(overrides)
+    return self.packer.make_can_msg_safety("LFA", 0, values)
+
+  def _angle_cmd(self, angle, active=True):
+    return self.packer.make_can_msg_safety("ADAS_CMD_35_10ms", 0, {"ADAS_ActvACILvl2Sta": 2 if active else 1,
+                                                                    "ADAS_StrAnglReqVal": angle})
+
+  def test_companion_allowed_regardless_of_controls(self):
+    for controls_allowed in (False, True):
+      self.safety.set_controls_allowed(controls_allowed)
+      self.assertTrue(self.safety.safety_tx_hook(self._companion()))
+
+  def test_companion_with_torque_blocked(self):
+    self.safety.set_controls_allowed(True)
+    self.assertFalse(self.safety.safety_tx_hook(self._companion(TORQUE_REQUEST=100)))
+    self.assertFalse(self.safety.safety_tx_hook(self._companion(STEER_REQ=1)))
+
+  def test_companion_does_not_consume_rt_budget(self):
+    # 0x12A + 0xCB at 100 Hz each for 2 s must not trip the 0xCB real-time angle limit
+    self.safety.set_controls_allowed(True)
+    for frame in range(200):
+      self.safety.set_timer(frame * 10000)
+      self.assertTrue(self.safety.safety_tx_hook(self._companion()))
+      self.assertTrue(self.safety.safety_tx_hook(self._angle_cmd(0.)))
+
+  def test_angle_cmd_still_limited(self):
+    self.safety.set_controls_allowed(True)
+    self.assertTrue(self.safety.safety_tx_hook(self._angle_cmd(0.1)))
+    self.assertTrue(self.safety.safety_tx_hook(self._companion()))
+    self.assertFalse(self.safety.safety_tx_hook(self._angle_cmd(20.)))
+    self.safety.set_controls_allowed(False)
+    self.assertFalse(self.safety.safety_tx_hook(self._angle_cmd(0.)))
+
+
 class TestHyundaiCanfdCcncAltButtonResume(unittest.TestCase):
   TX_MSGS = [[0x1AA, 2]]
 
