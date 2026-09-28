@@ -117,6 +117,7 @@ ANGLE_STEERING_CARS = (
   CAR.KIA_SPORTAGE_2026,
   CAR.KIA_SPORTAGE_HEV_2026,
   CAR.KIA_SORENTO_HEV_4TH_GEN_LFA2,
+  CAR.KIA_K8_HEV_1ST_GEN,
   CAR.KIA_EV6_2025,
   CAR.KIA_EV9,
   CAR.GENESIS_GV70_ELECTRIFIED_2ND_GEN,
@@ -584,6 +585,32 @@ class TestHyundaiFingerprint:
     assert CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING
     assert CP.steerControlType == CarParams.SteerControlType.angle
     assert CP.safetyConfigs[-1].safetyParam & HyundaiSafetyFlags.CANFD_ANGLE_STEERING
+
+  def test_k8_hev_gl3_pe_adas_harness_angle_and_longitudinal(self):
+    # 2026 K8 HEV GL3 PE rlog captured through the ADAS 18-pin harness:
+    # E-CAN=0, A-CAN=1, CAM=2. The camera publishes 0xCB angle commands,
+    # while 0x110 is present on A-CAN rather than the camera bus.
+    fingerprint = gen_empty_fingerprint()
+    fingerprint[0].update({0xFA: 32, 0x130: 16, 0x1CF: 8})
+    fingerprint[1].update({0x100: 24, 0x110: 32})
+    fingerprint[2].update({0xCB: 24, 0x12A: 16, 0x1A0: 32})
+
+    CP = CarInterface.get_params(CAR.KIA_K8_HEV_1ST_GEN, fingerprint, [], True, False, False, None)
+    CAN = CanBus(CP)
+
+    assert (CAN.ECAN, CAN.ACAN, CAN.CAM) == (0, 1, 2)
+    assert CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING
+    assert CP.flags & HyundaiFlags.CANFD_CAMERA_SCC
+    assert CP.flags & HyundaiFlags.HYBRID
+    assert not (CP.flags & HyundaiFlags.CANFD_LKA_STEERING)
+    assert CP.steerControlType == CarParams.SteerControlType.angle
+    assert CP.alphaLongitudinalAvailable
+    assert CP.openpilotLongitudinalControl
+    assert not CP.pcmCruise
+
+    expected_safety = (HyundaiSafetyFlags.CANFD_ANGLE_STEERING | HyundaiSafetyFlags.CAMERA_SCC |
+                       HyundaiSafetyFlags.HYBRID_GAS | HyundaiSafetyFlags.LONG)
+    assert (CP.safetyConfigs[-1].safetyParam & expected_safety) == expected_safety
 
   def test_ev9_uses_shared_angle_smoothing(self):
     ev9_cp = SimpleNamespace(carFingerprint=CAR.KIA_EV9)
