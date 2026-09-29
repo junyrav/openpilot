@@ -176,9 +176,7 @@ class CarInterface(CarInterfaceBase):
           ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
       else:
         # no LKA steering
-        # 2026 K8 HEV PE: 0x1CF is present but static (never changes); the real cruise buttons are in 0x1AA.
-        k8_alt_buttons = candidate == CAR.KIA_K8_HEV_1ST_GEN and 0x1aa in fingerprint[CAN.ECAN]
-        if 0x1cf not in fingerprint[CAN.ECAN] or k8_alt_buttons:
+        if 0x1cf not in fingerprint[CAN.ECAN]:
           ret.flags |= HyundaiFlags.CANFD_ALT_BUTTONS.value
         if not ret.flags & HyundaiFlags.RADAR_SCC:
           ret.flags |= HyundaiFlags.CANFD_CAMERA_SCC.value
