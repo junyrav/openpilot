@@ -239,6 +239,25 @@ class TestHyundaiCanfdAngleSteering(HyundaiButtonBase, common.CarSafetyTest):
   def _get_vm(self, car_name):
     return VehicleModel(CarInterface.get_non_essential_params(str(car_name)))
 
+  def _lfa_angle_path(self):
+    # Angle steering without LKA steering: stock 0x12A/0xCB pass through while openpilot is not in control
+    return not (self.SAFETY_PARAM & HyundaiSafetyFlags.CANFD_LKA_STEERING)
+
+  def test_fwd_hook(self):
+    if not self._lfa_angle_path():
+      return super().test_fwd_hook()
+    for controls_allowed in (False, True):
+      self.safety.set_controls_allowed(controls_allowed)
+      for bus in range(3):
+        for addr in self.SCANNED_ADDRS:
+          fwd_bus = self.FWD_BUS_LOOKUP.get(bus, -1)
+          blacklisted = bus in self.FWD_BLACKLISTED_ADDRS and addr in self.FWD_BLACKLISTED_ADDRS[bus]
+          if bus == 2 and addr in (0x12A, 0xCB):
+            blacklisted = controls_allowed
+          if blacklisted:
+            fwd_bus = -1
+          self.assertEqual(fwd_bus, self.safety.safety_fwd_hook(bus, addr), f"{addr=:#x} {bus=} {controls_allowed=}")
+
   def _baseline_limits(self):
     return CarControllerParams(CarInterface.get_non_essential_params(str(self.BASELINE_CAR)))
 
@@ -293,7 +312,10 @@ class TestHyundaiCanfdAngleSteering(HyundaiButtonBase, common.CarSafetyTest):
         for angle_cmd in np.arange(-90, 91, 10):
           self._set_prev_desired_angle(angle_cmd)
           self.assertEqual(controls_allowed, self._tx(self._angle_cmd_msg(angle_cmd, True)))
-          self.assertEqual(angle_cmd == angle_meas, self._tx(self._angle_cmd_msg(angle_cmd, False)))
+          # LFA-path angle trims: while openpilot is not in control the stock frames are forwarded instead,
+          # so openpilot's inactive frames are dropped too
+          inactive_ok = angle_cmd == angle_meas and (controls_allowed or not self._lfa_angle_path())
+          self.assertEqual(inactive_ok, self._tx(self._angle_cmd_msg(angle_cmd, False)))
 
   def test_lateral_accel_limit(self):
     limits = self._baseline_limits()
@@ -492,10 +514,21 @@ class TestHyundaiCanfdLfaAngleCompanion(unittest.TestCase):
     return self.packer.make_can_msg_safety("ADAS_CMD_35_10ms", 0, {"ADAS_ActvACILvl2Sta": 2 if active else 1,
                                                                     "ADAS_StrAnglReqVal": angle})
 
-  def test_companion_allowed_regardless_of_controls(self):
-    for controls_allowed in (False, True):
-      self.safety.set_controls_allowed(controls_allowed)
-      self.assertTrue(self.safety.safety_tx_hook(self._companion()))
+  def test_stock_pass_through_while_disengaged(self):
+    # disengaged: stock ADRV 0x12A/0xCB are forwarded untouched and openpilot's copies are dropped
+    self.safety.set_controls_allowed(False)
+    for addr in (0x12A, 0xCB):
+      self.assertEqual(0, self.safety.safety_fwd_hook(2, addr))
+    self.assertFalse(self.safety.safety_tx_hook(self._companion()))
+    self.assertFalse(self.safety.safety_tx_hook(self._angle_cmd(0., active=False)))
+    # engaged: stock frames are blocked and openpilot's are accepted
+    self.safety.set_controls_allowed(True)
+    for addr in (0x12A, 0xCB):
+      self.assertEqual(-1, self.safety.safety_fwd_hook(2, addr))
+    self.assertTrue(self.safety.safety_tx_hook(self._companion()))
+    self.assertTrue(self.safety.safety_tx_hook(self._angle_cmd(0., active=False)))
+    # other ADRV frames are unaffected
+    self.assertEqual(0, self.safety.safety_fwd_hook(2, 0x161))
 
   def test_companion_with_torque_blocked(self):
     self.safety.set_controls_allowed(True)

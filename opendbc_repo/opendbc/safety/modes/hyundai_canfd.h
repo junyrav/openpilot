@@ -89,6 +89,8 @@ static uint32_t hyundai_canfd_get_checksum(const CANPacket_t *msg) {
   return chksum;
 }
 
+#define HYUNDAI_CANFD_LFA_ANGLE_MAX_TX_MSGS 32
+
 static bool hyundai_canfd_lka_alt_forward_addr(int addr) {
   return (addr == 0x110) || (addr == 0x362);
 }
@@ -103,6 +105,22 @@ static bool hyundai_canfd_lka_alt_stock_forwarding(void) {
   return hyundai_canfd_lka_steering_alt && hyundai_canfd_angle_steering && !hyundai_canfd_lka_alt_openpilot_allowed();
 }
 
+// LFA-path angle trims (angle steering without LKA steering, e.g. 2026 K8 HEV PE via the ADAS/ADRV harness):
+// the ADRV's LFA (0x12A) and ADAS_CMD_35 (0xCB) are passed through untouched while openpilot is not in control,
+// so the MDPS/cluster keep seeing the exact stock frames (status, counters, FCA-ESA fields). openpilot's own
+// frames for these addresses are only accepted, and the stock ones only blocked, while controls are allowed.
+static bool hyundai_canfd_lfa_angle_forward_addr(int addr) {
+  return (addr == 0x12a) || (addr == 0xcb);
+}
+
+static bool hyundai_canfd_lfa_angle_path(void) {
+  return hyundai_canfd_angle_steering && !hyundai_canfd_lka_steering;
+}
+
+static bool hyundai_canfd_lfa_angle_stock_forwarding(void) {
+  return hyundai_canfd_lfa_angle_path() && !(aol_allowed || controls_allowed);
+}
+
 static void hyundai_canfd_rx_all_hook(const CANPacket_t *msg) {
   SAFETY_UNUSED(msg);
 }
@@ -112,6 +130,10 @@ static bool hyundai_canfd_fwd_hook(int bus_num, int addr) {
 
   if ((bus_num == 2) && hyundai_canfd_lka_steering_alt && hyundai_canfd_lka_alt_forward_addr(addr)) {
     return !hyundai_canfd_lka_alt_stock_forwarding();
+  }
+
+  if ((bus_num == 2) && hyundai_canfd_lfa_angle_path() && hyundai_canfd_lfa_angle_forward_addr(addr)) {
+    return !hyundai_canfd_lfa_angle_stock_forwarding();
   }
 
   // On LKA-steering long-control cars using live MRR35 radar tracks, openpilot parses
@@ -237,6 +259,10 @@ static bool hyundai_canfd_tx_hook(const CANPacket_t *msg) {
   bool tx = true;
 
   if ((msg->bus == 0U) && hyundai_canfd_lka_alt_forward_addr(msg->addr) && hyundai_canfd_lka_alt_stock_forwarding()) {
+    tx = false;
+  }
+
+  if ((msg->bus == 0U) && hyundai_canfd_lfa_angle_forward_addr(msg->addr) && hyundai_canfd_lfa_angle_stock_forwarding()) {
     tx = false;
   }
 
@@ -683,6 +709,18 @@ static safety_config hyundai_canfd_init(uint16_t param) {
         SET_RX_CHECKS(hyundai_canfd_rx_checks, ret);
       }
     }
+  }
+
+  // LFA-path angle trims: hand 0x12A/0xCB forwarding to the fwd hook (stock pass-through while disengaged).
+  if (hyundai_canfd_lfa_angle_path() && (ret.tx_msgs != NULL) && (ret.tx_msgs_len <= HYUNDAI_CANFD_LFA_ANGLE_MAX_TX_MSGS)) {
+    static CanMsg hyundai_canfd_lfa_angle_tx_msgs[HYUNDAI_CANFD_LFA_ANGLE_MAX_TX_MSGS];
+    for (int i = 0; i < ret.tx_msgs_len; i++) {
+      hyundai_canfd_lfa_angle_tx_msgs[i] = ret.tx_msgs[i];
+      if ((hyundai_canfd_lfa_angle_tx_msgs[i].bus == 0U) && hyundai_canfd_lfa_angle_forward_addr(hyundai_canfd_lfa_angle_tx_msgs[i].addr)) {
+        hyundai_canfd_lfa_angle_tx_msgs[i].disable_static_blocking = true;
+      }
+    }
+    ret.tx_msgs = hyundai_canfd_lfa_angle_tx_msgs;
   }
 
   return ret;

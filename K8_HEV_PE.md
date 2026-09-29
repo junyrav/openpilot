@@ -58,6 +58,11 @@ panda safety: `hyundaiCanfd` + `CANFD_ANGLE_STEERING | CAMERA_SCC | HYBRID_GAS |
   0xCB가 전부 차단되고(패널 txBlocked 12,000회) 순정 ADRV의 0xCB도 막혀 있어 MDPS가 0xCB를 전혀 받지 못함.
   이제 MDPS 조향각(0xEA STEERING_ANGLE)을 사용. 로그 조건 재현 시뮬레이션에서 비활성 0xCB 차단 100% → 0%.
 
+- **2026-09-29 (실차 rlog 반영, panda 펌웨어 변경)**: 위 수정 후에도 경고가 남아 rlog로 비교한 결과, 오픈파일럿이 대신 보내는
+  0x12A(LFA)가 순정과 100% 다름(순정 0x12A는 조향각 −65°~175° 동안 3가지 값뿐인 상태 프레임). 이제 오픈파일럿이 제어하지 않을 때는
+  순정 ADRV의 0x12A·0xCB를 그대로 통과시키고, 제어 중일 때만 오픈파일럿 프레임으로 교체 (StarPilot의 LKAS_ALT 순정 통과 방식과 동일).
+  롱컨 사용 시 0x1A0·0x160·0x1E0은 여전히 오픈파일럿 값으로 교체되며 순정과 다름 → "전방/측방 안전" 경고는 롱컨을 끄면 사라질 것으로 예상.
+
 ## 검증 (PC 시뮬레이션)
 
 - 로그 버스 구성으로 만든 fingerprint → 위 플래그/버스(0/1/2) 확인.
