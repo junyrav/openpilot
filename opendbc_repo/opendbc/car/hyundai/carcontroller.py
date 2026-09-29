@@ -949,6 +949,15 @@ class CarController(CarControllerBase):
                                                              CS.stock_lkas_msg if preserve_stock_lkas else None,
                                                              lka_icon=lka_icon,
                                                              longitudinal_active=lfa_longitudinal_active))
+      # LFA-path angle trims with a stock ADRV LFA (e.g. 2026 K8 HEV PE): mirror the stock frame instead of a
+      # synthesized one, flipping only the "LFA steering" pattern the ADRV itself uses while it steers.
+      stock_lfa_raw = getattr(CS, "stock_adrv_lfa_raw", b"")
+      lfa_path_angle = bool(self.CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING) and not lka_steering
+      if lfa_path_angle and self.CP.flags & HyundaiFlags.SEND_LFA and len(stock_lfa_raw) == 16:
+        self.mirrored_lfa_counter = (getattr(self, "mirrored_lfa_counter", 0) + 1) % 256
+        mirrored = hyundaicanfd.create_stock_mirrored_lfa(self.packer, self.CAN, stock_lfa_raw,
+                                                          bool(steering_msg_active), self.mirrored_lfa_counter)
+        can_sends = [mirrored if (m[0] == 0x12a and m[2] == self.CAN.ECAN) else m for m in can_sends]
     direct_steering_active = ccnc_angle_long and drive_gear and CC.latActive and self.direct_angle_request_allowed and not CS.angle_steering_fault
     inactive_steering_angle = float(np.clip(CS.angle_steering_angle,
                                             -self.params.ANGLE_LIMITS.STEER_ANGLE_MAX,

@@ -543,6 +543,19 @@ class TestHyundaiCanfdLfaAngleCompanion(unittest.TestCase):
       self.assertTrue(self.safety.safety_tx_hook(self._companion()))
       self.assertTrue(self.safety.safety_tx_hook(self._angle_cmd(0.)))
 
+  def test_stock_shaped_companion_allowed_while_engaged(self):
+    # stock ADRV LFA (2026 K8 HEV PE): torque raw 0 and lane info in bytes 9-12, byte 3 = 0x18 while steering
+    self.safety.set_controls_allowed(True)
+    for byte3 in (0x00, 0x18):
+      dat = bytearray.fromhex("0add1f00400000000042040404000000")
+      dat[3] = byte3
+      self.assertTrue(self.safety.safety_tx_hook(libsafety_py.make_CANPacket(0x12A, 0, bytes(dat))))
+    # but an angle-active field or a steer request still goes through the full checks / is rejected
+    dat = bytearray.fromhex("0add1f00400000000062040404000000")  # angle-active field = 2 with a large angle
+    self.assertFalse(self.safety.safety_tx_hook(libsafety_py.make_CANPacket(0x12A, 0, bytes(dat))))
+    dat = bytearray.fromhex("0add1f00400010000042040404000000")  # STEER_REQ set
+    self.assertFalse(self.safety.safety_tx_hook(libsafety_py.make_CANPacket(0x12A, 0, bytes(dat))))
+
   def test_angle_cmd_still_limited(self):
     self.safety.set_controls_allowed(True)
     self.assertTrue(self.safety.safety_tx_hook(self._angle_cmd(0.1)))

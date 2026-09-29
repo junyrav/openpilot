@@ -449,6 +449,15 @@ class CarInterface(CarInterfaceBase):
     CarInterface.init(CP, can_recv, can_send, communication_control)
 
   def update(self, can_packets, starpilot_toggles):
+    # LFA-path angle trims (e.g. 2026 K8 HEV PE): keep the raw stock ADRV LFA frame so the controller can
+    # reproduce it byte for byte (bytes 9-12 carry lane info that the DBC does not describe).
+    if self.CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING and self.CP.flags & HyundaiFlags.SEND_LFA and \
+       not self.CP.flags & HyundaiFlags.CANFD_LKA_STEERING:
+      cam_bus = CanBus(self.CP).CAM
+      for _, frames in can_packets:
+        for address, dat, src in frames:
+          if address == 0x12a and src == cam_bus and len(dat) == 16:
+            self.CS.stock_adrv_lfa_raw = bytes(dat)
     ret, fp_ret = super().update(can_packets, starpilot_toggles)
 
     # When ECU disable was skipped (READY mode boot) or failed, suppress CAN timeout errors.

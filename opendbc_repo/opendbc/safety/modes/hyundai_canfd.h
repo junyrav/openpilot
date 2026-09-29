@@ -309,12 +309,16 @@ static bool hyundai_canfd_tx_hook(const CANPacket_t *msg) {
       // desired-angle tracking. Anything that carries actuation still goes through the full checks below.
       const int lfa_torque = (((msg->data[6] & 0xFU) << 7U) | (msg->data[5] >> 1U)) - 1024U;
       const bool lfa_steer_req = GET_BIT(msg, 52U);
+      // Raw torque 1024 (=0) is what openpilot packs, raw 0 is what the stock ADRV sends; neither is a request.
+      const bool lfa_torque_idle = (lfa_torque == 0) || (lfa_torque == -1024);
+      // On these trims bytes 10-12 of the LFA frame hold lane/status info (2026 K8 HEV PE rlog: 3 distinct stock
+      // payloads while the wheel moved -65..175 deg), so an angle-active field of 0 with no steer request and an
+      // idle torque field marks the frame as status-only regardless of those bytes.
       const bool lfa_status_companion = !hyundai_canfd_lka_steering && (steer_addr == 0x12aU) &&
-                                        (lkas_angle_active == 0) && (desired_angle == 0) && (gain_raw == 0U) &&
-                                        (lfa_torque == 0) && !lfa_steer_req;
+                                        (lkas_angle_active == 0) && lfa_torque_idle && !lfa_steer_req;
 
       // Angle-steering platforms never actuate through the LFA torque fields.
-      if ((steer_addr == 0x12aU) && ((lfa_torque != 0) || lfa_steer_req)) {
+      if ((steer_addr == 0x12aU) && (!lfa_torque_idle || lfa_steer_req)) {
         tx = false;
       }
 

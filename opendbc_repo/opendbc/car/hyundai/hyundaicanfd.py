@@ -122,6 +122,17 @@ def _create_angle_adas_cmd_msg(packer, CAN, apply_angle: float, lat_active: bool
   return packer.make_can_msg("ADAS_CMD_35_10ms", CAN.ECAN, values)
 
 
+def create_stock_mirrored_lfa(packer, CAN, stock_lfa: bytes, lat_active: bool, counter: int):
+  # 2026 K8 HEV PE rlog: while the stock ADRV steers, LFA byte 3 is 0x18 (LKA_MODE 0, NEW_SIGNAL_1 3) and
+  # it is 0x00 otherwise; every other byte (incl. torque raw 0 and the lane info in bytes 9-12) is left as is.
+  dat = bytearray(stock_lfa)
+  dat[2] = counter & 0xFF
+  dat[3] = (dat[3] & 0xE0) | (0x18 if lat_active else 0x00)
+  dat[6] &= ~0x10  # STEER_REQ (bit 52) always clear: this frame never carries actuation
+  _update_checksum(packer, 0x12a, dat)
+  return 0x12a, bytes(dat), CAN.ECAN
+
+
 def create_angle_adas_cmd(packer, CAN, apply_angle: float, lat_active: bool, torque_reduction_gain: float):
   return _create_angle_adas_cmd_msg(packer, CAN, apply_angle, lat_active, torque_reduction_gain)
 

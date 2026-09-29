@@ -67,6 +67,11 @@ panda safety: `hyundaiCanfd` + `CANFD_ANGLE_STEERING | CAMERA_SCC | HYBRID_GAS |
   (rlog 60초간 0x1CF 변화 0회, 0x1AA 1,230회). 기존 코드는 0x1CF가 있으면 그걸 읽어서 SET/RES를 영원히 못 봄 → K8은 0x1AA 사용
   (StarPilot의 2025 카니발 예외와 동일). 실제 rlog CAN에 SET 입력을 넣어 재생: 버튼 인식 + panda 활성화 허용 확인.
 
+- **2026-09-29 (조향 안 됨, panda 펌웨어 변경)**: 이전 rlog에서 순정 HDA2가 실제로 조향한 약 8초 구간을 찾아 비교.
+  순정은 조향 중 0x12A byte3=0x18, 그 외 바이트(토크 raw 0, byte9-12 차선 정보)는 그대로. 오픈파일럿은 기본값으로 만든
+  0x12A를 보내고 있었음 → 활성 중에는 최신 순정 0x12A를 그대로 복사하고 byte3만 순정 조향 패턴(0x18)으로 바꿔 보냄.
+  panda 규칙도 이 형태(차선 정보 포함, 토크 raw 0)를 상태 프레임으로 인정하도록 수정 (조향 요청 비트·토크는 계속 차단).
+
 ## 검증 (PC 시뮬레이션)
 
 - 로그 버스 구성으로 만든 fingerprint → 위 플래그/버스(0/1/2) 확인.
