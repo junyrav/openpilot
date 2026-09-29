@@ -63,6 +63,10 @@ panda safety: `hyundaiCanfd` + `CANFD_ANGLE_STEERING | CAMERA_SCC | HYBRID_GAS |
   순정 ADRV의 0x12A·0xCB를 그대로 통과시키고, 제어 중일 때만 오픈파일럿 프레임으로 교체 (StarPilot의 LKAS_ALT 순정 통과 방식과 동일).
   롱컨 사용 시 0x1A0·0x160·0x1E0은 여전히 오픈파일럿 값으로 교체되며 순정과 다름 → "전방/측방 안전" 경고는 롱컨을 끄면 사라질 것으로 예상.
 
+- **2026-09-29 (자동주행 활성화 안 됨)**: 이 차의 0x1CF(크루즈 버튼)는 값이 전혀 변하지 않는 더미 프레임이고 실제 버튼은 0x1AA에 있음
+  (rlog 60초간 0x1CF 변화 0회, 0x1AA 1,230회). 기존 코드는 0x1CF가 있으면 그걸 읽어서 SET/RES를 영원히 못 봄 → K8은 0x1AA 사용
+  (StarPilot의 2025 카니발 예외와 동일). 실제 rlog CAN에 SET 입력을 넣어 재생: 버튼 인식 + panda 활성화 허용 확인.
+
 ## 검증 (PC 시뮬레이션)
 
 - 로그 버스 구성으로 만든 fingerprint → 위 플래그/버스(0/1/2) 확인.
