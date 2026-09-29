@@ -163,6 +163,8 @@ class CarState(CarStateBase):
     self.blindspots_front_corner_1_ts = 0
     self.left_blindspot_from_radar = False
     self.right_blindspot_from_radar = False
+    # LFA-path angle trims (0xCB): panda safety tracks MDPS->STEERING_ANGLE, so the controller must too.
+    self.mdps_steering_angle = 0.0
     if CP.carFingerprint in CANFD_ANGLE_LONGITUDINAL_CAR:
       self.hba_icon = 0
       self.main_cruise_on = False
@@ -533,6 +535,7 @@ class CarState(CarStateBase):
     ret.steeringTorqueEps = cp.vl["MDPS"]["STEERING_OUT_TORQUE"]
     ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > self.params.STEER_THRESHOLD, 5)
     ret.steerFaultTemporary = cp.vl["MDPS"]["LKA_FAULT"] != 0
+    self.mdps_steering_angle = cp.vl["MDPS"]["STEERING_ANGLE"]
     if self.CP.carFingerprint in CANFD_ANGLE_LONGITUDINAL_CAR:
       self.angle_steering_angle = cp.vl["MDPS"]["STEERING_ANGLE_2"]
       self.angle_steering_fault = cp.vl["MDPS"]["LKA_ANGLE_FAULT"] != 0

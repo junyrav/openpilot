@@ -573,7 +573,17 @@ class CarController(CarControllerBase):
     if not self.CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING:
       self.params = CarControllerParams(self.CP, CS.out.vEgoRaw)
     direct_angle_control = self.CP.carFingerprint in CANFD_ANGLE_LONGITUDINAL_CAR and self.long_active_ecu
-    measured_steering_angle = CS.angle_steering_angle if direct_angle_control else CS.out.steeringAngleDeg
+    # On LFA-path angle trims (ADAS_CMD_35 0xCB on E-CAN, e.g. 2026 K8 HEV PE) the panda validates the inactive
+    # angle and resets its rate-limit baseline against MDPS->STEERING_ANGLE, which differs from STEERING_SENSORS by
+    # tenths of a degree (more while turning). Tracking STEERING_SENSORS got every inactive 0xCB rejected, so the
+    # MDPS received no ADAS_CMD_35 at all and the cluster raised LKA/LFA/FCA faults.
+    lfa_path_angle = bool(self.CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING) and not (self.CP.flags & HyundaiFlags.CANFD_LKA_STEERING)
+    if direct_angle_control:
+      measured_steering_angle = CS.angle_steering_angle
+    elif lfa_path_angle:
+      measured_steering_angle = getattr(CS, "mdps_steering_angle", CS.out.steeringAngleDeg)
+    else:
+      measured_steering_angle = CS.out.steeringAngleDeg
     angle_lat_active = CC.latActive
     if direct_angle_control and CC.latActive:
       drive_gear = CS.out.gearShifter == structs.CarState.GearShifter.drive

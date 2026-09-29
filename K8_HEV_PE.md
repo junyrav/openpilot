@@ -51,6 +51,13 @@ panda safety: `hyundaiCanfd` + `CANFD_ANGLE_STEERING | CAMERA_SCC | HYBRID_GAS |
 5. `starpilot/system/k8_pe_defaults.py`, `system/manager/manager.py` — 첫 부팅 차량 프리셋.
 6. `opendbc/safety/tests/test_hyundai_canfd.py` — 위 safety 동작 테스트 4건 추가.
 
+## 수정 이력
+
+- **2026-09-29 (실차 qlog 반영)**: 오픈파일럿 비활성 상태에서 계기판에 "차로 안전 / 전방·측방 안전 / 차로 유지 보조 시스템 점검"이 뜨던 문제 수정.
+  원인: 비활성 0xCB(ADAS_CMD_35)에 STEERING_SENSORS 조향각을 넣었는데, panda는 MDPS 조향각 기준 ±0.1°만 허용 →
+  0xCB가 전부 차단되고(패널 txBlocked 12,000회) 순정 ADRV의 0xCB도 막혀 있어 MDPS가 0xCB를 전혀 받지 못함.
+  이제 MDPS 조향각(0xEA STEERING_ANGLE)을 사용. 로그 조건 재현 시뮬레이션에서 비활성 0xCB 차단 100% → 0%.
+
 ## 검증 (PC 시뮬레이션)
 
 - 로그 버스 구성으로 만든 fingerprint → 위 플래그/버스(0/1/2) 확인.
