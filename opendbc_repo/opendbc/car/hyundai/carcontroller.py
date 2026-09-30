@@ -986,6 +986,12 @@ class CarController(CarControllerBase):
         can_sends.extend(hyundaicanfd.create_ccnc(self.packer, self.CAN, self.long_active_ecu, CC.enabled, CC.hudControl,
                                                   CC.leftBlinker, CC.rightBlinker, CS.msg_161, CS.msg_162, CS.msg_1b5,
                                                   CS.is_metric, CS.out, CS.out.cruiseState.available, lfa_icon))
+        # LFA-path angle trims (2026 K8 HEV PE): the panda blocks the stock LFAHDA_CLUSTER, so mirror it.
+        stock_lfahda_raw = getattr(CS, "stock_adrv_lfahda_raw", b"")
+        if self.CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING and len(stock_lfahda_raw) == 16:
+          self.mirrored_lfahda_counter = (getattr(self, "mirrored_lfahda_counter", 0) + 1) % 256
+          can_sends.append(hyundaicanfd.create_stock_mirrored_lfahda_cluster(
+            self.packer, self.CAN, stock_lfahda_raw, bool(CC.longActive), bool(CC.latActive), self.mirrored_lfahda_counter))
       else:
         cluster_base_values = CS.stock_lfahda_cluster_msg if preserve_stock_lfa_status else None
         can_sends.append(hyundaicanfd.create_lfahda_cluster(self.packer, self.CAN, CC.enabled, cluster_base_values,
@@ -1122,10 +1128,14 @@ class CarController(CarControllerBase):
             jerk_upper=acc_kwargs["jerk_upper"],
           ))
         else:
-          can_sends.append(hyundaicanfd.create_acc_control(
+          acc_msg = hyundaicanfd.create_acc_control(
             self.packer, self.CAN, CC.enabled, self.accel_last, accel, stopping, CC.cruiseControl.override,
             set_speed_in_units, hud_control, cruise_info=CS.cruise_info if ccnc_non_hda2 else None, **acc_kwargs,
-          ))
+          )
+          stock_scc_raw = getattr(CS, "stock_adrv_scc_raw", b"")
+          if ccnc_non_hda2 and self.CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING and len(stock_scc_raw) == 32:
+            acc_msg = hyundaicanfd.create_stock_mirrored_scc_control(self.packer, acc_msg, stock_scc_raw)
+          can_sends.append(acc_msg)
         self.accel_last = accel
     else:
       # button presses

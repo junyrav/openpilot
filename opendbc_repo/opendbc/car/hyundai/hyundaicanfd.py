@@ -133,6 +133,58 @@ def create_stock_mirrored_lfa(packer, CAN, stock_lfa: bytes, lat_active: bool, c
   return 0x12a, bytes(dat), CAN.ECAN
 
 
+def create_stock_mirrored_lfahda_cluster(packer, CAN, stock_lfahda: bytes, long_active: bool, lat_active: bool, counter: int):
+  # Same approach as CarrotPilot on ccNC camera-SCC cars: keep the stock ADRV LFAHDA_CLUSTER and only drive the
+  # HDA control state (bits 30-31, = HDA_ICON at bit 31) and the HDA/LFA symbol (bits 47-48, = LFA_ICON).
+  dat = bytearray(stock_lfahda)
+  dat[2] = counter & 0xFF
+  dat[3] = (dat[3] & 0x3F) | (0x80 if long_active else 0x00)          # HDA_CntrlModSta: 2 = active
+  dat[5] = (dat[5] & 0x7F)                                            # bit 47 = 0
+  dat[6] = (dat[6] & 0xFE) | (0x01 if lat_active else 0x00)           # bit 48: HDA_LFA_SymSta 2 = steering
+  _update_checksum(packer, 0x1e0, dat)
+  return 0x1e0, bytes(dat), CAN.ECAN
+
+
+def _bit_range(start, length):
+  return range(start, start + length)
+
+
+# SCC_CONTROL bit positions (Intel numbering: byte = bit // 8) following the Hyundai signal names CarrotPilot uses.
+_SCC_BITS_FROM_OPENPILOT = [
+  66, *_bit_range(68, 3),        # MainMode_ACC, ACCMode
+  76,                            # CRUISE_STANDSTILL
+  *_bit_range(88, 4),            # DISTANCE_SETTING
+  *_bit_range(96, 8),            # VSetDis
+  *_bit_range(128, 11), *_bit_range(140, 11),  # aReqValue, aReqRaw
+  *_bit_range(152, 7), *_bit_range(160, 7),    # JerkUpperLimit, JerkLowerLimit
+  184, 185,                      # StopReq
+]
+_SCC_BITS_CLEARED = [
+  64, 65,                        # SysFailState (non-zero: car refuses to accelerate)
+  72, 73,                        # TakeOverReq
+  *_bit_range(74, 3),            # InfoDisplay
+  77, 78,                        # DriverAlert
+  *_bit_range(112, 3),           # DriveMode
+  *_bit_range(168, 6), *_bit_range(176, 6),    # AccelLimitBandUpper / Lower (non-zero: no acceleration)
+]
+
+
+def create_stock_mirrored_scc_control(packer, openpilot_msg, stock_scc: bytes):
+  # CarrotPilot-style SCC_CONTROL for camera-SCC cars whose ADRV frame is blocked (2026 K8 HEV PE): start from the
+  # stock ADRV frame (lead/object info, cluster fields), take the control fields from openpilot's own frame and clear
+  # the ADRV status fields that inhibit acceleration. Counter comes from openpilot's frame.
+  address, op_dat, bus = openpilot_msg
+  dat = bytearray(stock_scc)
+  dat[2] = op_dat[2]
+  for b in _SCC_BITS_FROM_OPENPILOT:
+    mask = 1 << (b % 8)
+    dat[b // 8] = (dat[b // 8] & ~mask) | (op_dat[b // 8] & mask)
+  for b in _SCC_BITS_CLEARED:
+    dat[b // 8] &= ~(1 << (b % 8))
+  _update_checksum(packer, address, dat)
+  return address, bytes(dat), bus
+
+
 def create_angle_adas_cmd(packer, CAN, apply_angle: float, lat_active: bool, torque_reduction_gain: float):
   return _create_angle_adas_cmd_msg(packer, CAN, apply_angle, lat_active, torque_reduction_gain)
 

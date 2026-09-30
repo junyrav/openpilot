@@ -72,6 +72,13 @@ panda safety: `hyundaiCanfd` + `CANFD_ANGLE_STEERING | CAMERA_SCC | HYBRID_GAS |
   0x12A를 보내고 있었음 → 활성 중에는 최신 순정 0x12A를 그대로 복사하고 byte3만 순정 조향 패턴(0x18)으로 바꿔 보냄.
   panda 규칙도 이 형태(차선 정보 포함, 토크 raw 0)를 상태 프레임으로 인정하도록 수정 (조향 요청 비트·토크는 계속 차단).
 
+- **2026-09-30 (롱컨 시 계기판 경고·HUD 미연동, 당근파일럿 방식 적용)**: 41d1ef8 실주행 rlog에서 조향(명령 대비 실제 조향각 중앙값 오차 0.3°)과
+  롱컨 동작 확인. 남은 문제는 롱컨 시 초반 경고 3개와 계기판 HUD 미연동. 원인: StarPilot이 camera-SCC 롱컨에서 0x160에 "AEB 꺼짐" 표시를
+  일부러 보내고, 0x1E0/0x1A0은 기본값으로 만들어 보냄. 당근파일럿 코드를 확인해 같은 방식 적용:
+  ccNC(CCNC) 경로 사용 → 0x161/0x162 계기판 HUD를 오픈파일럿이 보내고 0x160은 순정 그대로 통과,
+  0x1E0(LFAHDA_CLUSTER)은 순정 복사 후 HDA/LFA 상태만 변경, 0x1A0(SCC_CONTROL)은 순정 복사 후 제어 필드만 오픈파일럿 값으로,
+  가속을 막는 필드(SysFailState·TakeOverReq·AccelLimitBand 등)는 0. 실제 rlog 3개 세그먼트 재생에서 활성 중 panda 차단 0건.
+
 ## 검증 (PC 시뮬레이션)
 
 - 로그 버스 구성으로 만든 fingerprint → 위 플래그/버스(0/1/2) 확인.

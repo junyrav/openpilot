@@ -166,6 +166,8 @@ class CarState(CarStateBase):
     # LFA-path angle trims (0xCB): panda safety tracks MDPS->STEERING_ANGLE, so the controller must too.
     self.mdps_steering_angle = 0.0
     self.stock_adrv_lfa_raw = b""
+    self.stock_adrv_lfahda_raw = b""
+    self.stock_adrv_scc_raw = b""
     if CP.carFingerprint in CANFD_ANGLE_LONGITUDINAL_CAR:
       self.hba_icon = 0
       self.main_cruise_on = False

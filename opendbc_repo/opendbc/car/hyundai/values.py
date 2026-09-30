@@ -635,7 +635,10 @@ class CAR(Platforms):
     # E-CAN=0, A-CAN=1 (camera LKAS_ALT 0x110 lives here), ADRV=2 (0xCB, LFA 0x12A, SCC_CONTROL 0x1A0),
     # which the fingerprint auto-detects as LFA steering + camera SCC. NOTE: pre-facelift torque-steer
     # K8s must NOT run this branch. HYBRID is detected at runtime from 0xFA on E-CAN.
-    flags=HyundaiFlags.CANFD_ANGLE_STEERING,
+    # The PE has the ccNC cluster: the ADRV publishes CCNC_0x161/0x162 on bus 2 (seen in every K8 PE log), so use
+    # StarPilot's ccNC path (openpilot HUD on the cluster, stock ADRV_0x160/LFAHDA_CLUSTER passed through), which is
+    # also what CarrotPilot does on this car.
+    flags=HyundaiFlags.CANFD_ANGLE_STEERING | HyundaiFlags.CCNC,
   )
   KIA_NIRO_EV = HyundaiPlatformConfig(
     [

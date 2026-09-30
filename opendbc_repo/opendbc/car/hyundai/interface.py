@@ -456,6 +456,10 @@ class CarInterface(CarInterfaceBase):
         for address, dat, src in frames:
           if address == 0x12a and src == cam_bus and len(dat) == 16:
             self.CS.stock_adrv_lfa_raw = bytes(dat)
+          elif address == 0x1e0 and src == cam_bus and len(dat) == 16:
+            self.CS.stock_adrv_lfahda_raw = bytes(dat)
+          elif address == 0x1a0 and src == cam_bus and len(dat) == 32:
+            self.CS.stock_adrv_scc_raw = bytes(dat)
     ret, fp_ret = super().update(can_packets, starpilot_toggles)
 
     # When ECU disable was skipped (READY mode boot) or failed, suppress CAN timeout errors.
