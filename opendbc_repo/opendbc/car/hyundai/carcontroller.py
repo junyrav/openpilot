@@ -983,9 +983,17 @@ class CarController(CarControllerBase):
     # LFA and HDA icons
     if self.frame % 5 == 0 and (not lka_steering or lka_steering_long) and not ccnc_angle_long:
       if ccnc_non_hda2:
+        # LFA-path angle trims (2026 K8 HEV PE): the camera lead frame (FR_CMR_03_50ms) is on E-CAN, not on the ADRV
+        # bus, so the stock msg_1b5 distance is 0 and a lead car would be drawn right at the bumper. Use openpilot's lead.
+        lead_override = None
+        if self.CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING:
+          op_lead_distance = float(getattr(CS, "openpilot_lead_distance", 0.0))
+          op_lead_visible = bool(getattr(CS, "openpilot_lead_visible", False) or CC.hudControl.leadVisible)
+          lead_override = (op_lead_visible and op_lead_distance > 0.5, op_lead_distance)
         can_sends.extend(hyundaicanfd.create_ccnc(self.packer, self.CAN, self.long_active_ecu, CC.enabled, CC.hudControl,
                                                   CC.leftBlinker, CC.rightBlinker, CS.msg_161, CS.msg_162, CS.msg_1b5,
-                                                  CS.is_metric, CS.out, CS.out.cruiseState.available, lfa_icon))
+                                                  CS.is_metric, CS.out, CS.out.cruiseState.available, lfa_icon,
+                                                  lead_override=lead_override))
         # LFA-path angle trims (2026 K8 HEV PE): the panda blocks the stock LFAHDA_CLUSTER, so mirror it.
         stock_lfahda_raw = getattr(CS, "stock_adrv_lfahda_raw", b"")
         if self.CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING and len(stock_lfahda_raw) == 16:

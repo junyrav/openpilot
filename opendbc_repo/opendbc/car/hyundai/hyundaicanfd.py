@@ -427,7 +427,7 @@ def create_lfahda_cluster(packer, CAN, enabled, base_values=None, lfa_icon=None)
 
 
 def create_ccnc(packer, CAN, openpilot_longitudinal, enabled, hud, left_blinker, right_blinker, msg_161, msg_162, msg_1b5,
-                is_metric, out, main_cruise_enabled, lfa_icon):
+                is_metric, out, main_cruise_enabled, lfa_icon, lead_override=None):
   for fault in ("FAULT_LSS", "FAULT_HDA", "FAULT_DAS", "FAULT_LFA", "FAULT_DAW", "FAULT_ESS"):
     msg_162[fault] = 0
 
@@ -516,8 +516,15 @@ def create_ccnc(packer, CAN, openpilot_longitudinal, enabled, hud, left_blinker,
       "NAV_ICON": 0,
       "TARGET": 0,
     })
-    msg_162["LEAD"] = 0 if not main_cruise_enabled else 2 if enabled else 1
-    msg_162["LEAD_DISTANCE"] = msg_1b5["Longitudinal_Distance"]
+    if lead_override is not None:
+      # (visible, distance_m) from openpilot's own lead: only draw a lead car when there is one, like the stock ADRV
+      # (LEAD 0 / 204.6 m when nothing is ahead). Used when the camera lead frame is not on the ADRV bus.
+      lead_visible, lead_distance = lead_override
+      msg_162["LEAD"] = 0 if not (main_cruise_enabled and lead_visible) else 2 if enabled else 1
+      msg_162["LEAD_DISTANCE"] = min(max(lead_distance, 0.0), 204.6) if lead_visible else 204.6
+    else:
+      msg_162["LEAD"] = 0 if not main_cruise_enabled else 2 if enabled else 1
+      msg_162["LEAD_DISTANCE"] = msg_1b5["Longitudinal_Distance"]
 
   return [packer.make_can_msg(msg, CAN.ECAN, values) for msg, values in (("CCNC_0x161", msg_161), ("CCNC_0x162", msg_162))]
 

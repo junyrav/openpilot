@@ -79,6 +79,12 @@ panda safety: `hyundaiCanfd` + `CANFD_ANGLE_STEERING | CAMERA_SCC | HYBRID_GAS |
   0x1E0(LFAHDA_CLUSTER)은 순정 복사 후 HDA/LFA 상태만 변경, 0x1A0(SCC_CONTROL)은 순정 복사 후 제어 필드만 오픈파일럿 값으로,
   가속을 막는 필드(SysFailState·TakeOverReq·AccelLimitBand 등)는 0. 실제 rlog 3개 세그먼트 재생에서 활성 중 panda 차단 0건.
 
+- **2026-09-30 (계기판에 차량이 범퍼 바로 앞에 표시됨)**: ccNC HUD가 크루즈 메인만 켜져 있으면 선행차를 항상 표시하고, 거리는 ADRV 버스의
+  카메라 선행차 메시지(0x1B5)에서 가져오는데 이 차는 0x1B5가 E-CAN(bus 0)에만 있어 거리 0 → 범퍼 앞 차량. 이 차는 오픈파일럿 레이더/모델의
+  선행차로 표시(없으면 순정처럼 LEAD 0 / 204.6 m). 실제 rlog 재생: 선행차 있을 때만 116 m·32 m 등 실제 거리로 표시.
+  남은 경고 2개는 순정 ADRV가 스스로 FAULT_LFA/FAULT_DAS를 띄우는 것으로 확인(이전 버전 로그에도 존재) — LKAS 버튼이나 SET으로
+  순정 LFA/HDA가 같이 켜졌는데 조향 명령이 막히면서 발생하는 것으로 보임.
+
 ## 검증 (PC 시뮬레이션)
 
 - 로그 버스 구성으로 만든 fingerprint → 위 플래그/버스(0/1/2) 확인.
