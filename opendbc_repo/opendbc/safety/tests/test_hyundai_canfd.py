@@ -565,6 +565,21 @@ class TestHyundaiCanfdLfaAngleCompanion(unittest.TestCase):
     self.assertFalse(self.safety.safety_tx_hook(self._angle_cmd(0.)))
 
 
+class TestHyundaiCanfdLfaAngleCcncMdpsForwarding(unittest.TestCase):
+  """2026 K8 HEV PE: ccNC + LFA-path angle steering must keep forwarding the real MDPS frame to the ADRV."""
+  TX_MSGS = []
+
+  def test_mdps_forwarded_to_adrv(self):
+    safety = libsafety_py.libsafety
+    for long in (False, True):
+      param = HyundaiSafetyFlags.CANFD_ANGLE_STEERING | HyundaiSafetyFlags.CAMERA_SCC | HyundaiSafetyFlags.HYBRID_GAS | \
+              HyundaiSafetyFlags.CCNC | (HyundaiSafetyFlags.LONG if long else 0)
+      safety.set_safety_hooks(CarParams.SafetyModel.hyundaiCanfd, param)
+      safety.init_tests()
+      self.assertEqual(2, safety.safety_fwd_hook(0, 0xEA))
+      self.assertEqual(2, safety.safety_fwd_hook(0, 0x7C4))
+
+
 class TestHyundaiCanfdCcncAltButtonResume(unittest.TestCase):
   TX_MSGS = [[0x1AA, 2]]
 

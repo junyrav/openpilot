@@ -723,6 +723,13 @@ static safety_config hyundai_canfd_init(uint16_t param) {
       if ((hyundai_canfd_lfa_angle_tx_msgs[i].bus == 0U) && hyundai_canfd_lfa_angle_forward_addr(hyundai_canfd_lfa_angle_tx_msgs[i].addr)) {
         hyundai_canfd_lfa_angle_tx_msgs[i].disable_static_blocking = true;
       }
+      // The ccNC lists reserve MDPS (0xEA) and the camera diagnostic address (0x7C4) on bus 2 for platforms where
+      // openpilot spoofs them to the ADRV. LFA-path trims do not: blocking the real frames starves the ADRV of the
+      // MDPS status, and ~6 s later it latches FCA/LCA/DAS faults (2026 K8 HEV PE rlogs). Keep forwarding them.
+      if ((hyundai_canfd_lfa_angle_tx_msgs[i].bus == 2U) &&
+          ((hyundai_canfd_lfa_angle_tx_msgs[i].addr == 0xEA) || (hyundai_canfd_lfa_angle_tx_msgs[i].addr == 0x7C4))) {
+        hyundai_canfd_lfa_angle_tx_msgs[i].disable_static_blocking = true;
+      }
     }
     ret.tx_msgs = hyundai_canfd_lfa_angle_tx_msgs;
   }

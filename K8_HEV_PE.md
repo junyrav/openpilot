@@ -85,6 +85,11 @@ panda safety: `hyundaiCanfd` + `CANFD_ANGLE_STEERING | CAMERA_SCC | HYBRID_GAS |
   남은 경고 2개는 순정 ADRV가 스스로 FAULT_LFA/FAULT_DAS를 띄우는 것으로 확인(이전 버전 로그에도 존재) — LKAS 버튼이나 SET으로
   순정 LFA/HDA가 같이 켜졌는데 조향 명령이 막히면서 발생하는 것으로 보임.
 
+- **2026-09-30 (전방/측방 안전·차로 변경 보조 점검 경고, panda 펌웨어 변경)**: e11fa5e부터 순정 ADRV가 시동 약 6.5초 후
+  FAULT_FCA·FAULT_LCA·FAULT_DAS를 스스로 띄움(41d1ef8 로그에는 없음). 원인: ccNC TX 목록이 bus 2의 0xEA(MDPS)·0x7C4를
+  "오픈파일럿이 대신 보내는 프레임"으로 예약해서 실제 MDPS 프레임이 ADRV로 전달되지 않음(로그: bus0→ADRV 미전달 메시지 0xEA 하나).
+  이 차 경로(LFA 각도조향)는 대신 보내지 않으므로 0xEA/0x7C4를 다시 ADRV로 전달. 안전 테스트 1945건 통과.
+
 ## 검증 (PC 시뮬레이션)
 
 - 로그 버스 구성으로 만든 fingerprint → 위 플래그/버스(0/1/2) 확인.
