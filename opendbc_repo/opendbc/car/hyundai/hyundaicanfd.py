@@ -427,7 +427,7 @@ def create_lfahda_cluster(packer, CAN, enabled, base_values=None, lfa_icon=None)
 
 
 def create_ccnc(packer, CAN, openpilot_longitudinal, enabled, hud, left_blinker, right_blinker, msg_161, msg_162, msg_1b5,
-                is_metric, out, main_cruise_enabled, lfa_icon, lead_override=None):
+                is_metric, out, main_cruise_enabled, lfa_icon, lead_override=None, lfa_standby=False):
   # FAULT_LCA: openpilot replaces the stock lane-change path, so the ADRV can latch its service flag (CarrotPilot hides
   # it too). FAULT_FCA (forward collision / AEB) is deliberately left visible.
   for fault in ("FAULT_LSS", "FAULT_HDA", "FAULT_DAS", "FAULT_LFA", "FAULT_DAW", "FAULT_ESS", "FAULT_LCA"):
@@ -449,7 +449,8 @@ def create_ccnc(packer, CAN, openpilot_longitudinal, enabled, hud, left_blinker,
   msg_161.update({
     "DAW_ICON": 0,
     "LKA_ICON": 0,
-    "LFA_ICON": 2 if lfa_icon else 0,
+    # 1 = white/grey standby wheel (Always On Lateral armed, e.g. via LKAS, but not steering), like stock/CarrotPilot
+    "LFA_ICON": 2 if lfa_icon else 1 if lfa_standby else 0,
     "CENTERLINE": 1 if lfa_icon else 0,
     "LANELINE_CURVATURE": curvature.get(max(-15, min(int(out.steeringAngleDeg / 4.5), 15)), 14) if lfa_icon and not any_blinker else 15,
     "LANELINE_LEFT": 0 if not lfa_icon else 1 if not hud.leftLaneVisible else 4 if hud.leftLaneDepart else 6 if any_blinker else 2,

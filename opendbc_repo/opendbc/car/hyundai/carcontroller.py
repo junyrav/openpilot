@@ -993,7 +993,9 @@ class CarController(CarControllerBase):
         can_sends.extend(hyundaicanfd.create_ccnc(self.packer, self.CAN, self.long_active_ecu, CC.enabled, CC.hudControl,
                                                   CC.leftBlinker, CC.rightBlinker, CS.msg_161, CS.msg_162, CS.msg_1b5,
                                                   CS.is_metric, CS.out, CS.out.cruiseState.available, lfa_icon,
-                                                  lead_override=lead_override))
+                                                  lead_override=lead_override,
+                                                  lfa_standby=bool(self.CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING and
+                                                                   getattr(CS, "aol_standby", False))))
         # LFA-path angle trims (2026 K8 HEV PE): the panda blocks the stock LFAHDA_CLUSTER, so mirror it.
         stock_lfahda_raw = getattr(CS, "stock_adrv_lfahda_raw", b"")
         if self.CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING and len(stock_lfahda_raw) == 16:

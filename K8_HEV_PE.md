@@ -107,6 +107,9 @@ panda safety: `hyundaiCanfd` + `CANFD_ANGLE_STEERING | CAMERA_SCC | HYBRID_GAS |
   - 당근처럼 ADRV가 보는 MDPS 사본에만 10초마다 0.4초간 핸들 토크 +220 추가(오픈파일럿이 조향권을 가질 때만). 오픈파일럿 운전자 모니터링은 그대로.
     핸들 터치 센서(0x2AF)는 체크섬 방식이 확인되지 않아 건드리지 않음.
 
+- **2026-10-02 (LKAS 대기 핸들 표시)**: Always On Lateral이 켜져 있지만 조향 중이 아니면 계기판에 대기(흰/회색) 핸들,
+  조향 중이면 활성(초록) 핸들 표시 — 당근/순정과 동일. 0x161 LFA_ICON 1/2.
+
 ## 당근파일럿 vs StarPilot 차량 인터페이스 비교 (이 차 경로: camera SCC + LFA 각도조향)
 
 | 메시지 | 당근파일럿 | StarPilot K8-HEV-PE (현재) |

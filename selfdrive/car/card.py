@@ -475,6 +475,8 @@ class Car:
       now_nanos = self.can_log_mono_time if REPLAY else int(time.monotonic() * 1e9)
       self._update_redneck_cruise(CS, CC)
       self._update_openpilot_lead_state(CC)
+      # Always On Lateral armed (e.g. toggled with LKAS) -> lets the car controller show a standby wheel on the cluster
+      self.CI.CS.aol_standby = bool(self.starpilot_card.always_on_lateral_allowed and self.starpilot_card.always_on_lateral_set)
       if self.CP.brand == "rivian" and self.sm.all_checks(['liveParameters']) and hasattr(self.CI.CC, 'update_live_params'):
         live_params = self.sm['liveParameters']
         self.CI.CC.update_live_params(live_params.roll, live_params.angleOffsetDeg,
