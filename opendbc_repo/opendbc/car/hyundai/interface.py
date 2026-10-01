@@ -460,6 +460,12 @@ class CarInterface(CarInterfaceBase):
             self.CS.stock_adrv_lfahda_raw = bytes(dat)
           elif address == 0x1a0 and src == cam_bus and len(dat) == 32:
             self.CS.stock_adrv_scc_raw = bytes(dat)
+          elif address == 0x4be and src == CanBus(self.CP).ECAN and self.CS.navi_events is not None:
+            self.CS.navi_4be_frames.append(bytes(dat))
+          elif address == 0x4a3 and src == CanBus(self.CP).ECAN and self.CS.navi_events is not None:
+            self.CS.navi_4a3_raw = bytes(dat)
+          elif address == 0x4b4 and src == CanBus(self.CP).ECAN and self.CS.navi_events is not None:
+            self.CS.navi_4b4_raw = bytes(dat)
           elif address == 0x1aa and src == CanBus(self.CP).ECAN and len(dat) >= 9:
             # dashboard speed: byte 6 in 0.5 km/h (byte 8 = the integer shown, CarrotPilot's CLU_SPEED).
             # The speedometer reads ~2-3 km/h above wheel speed; stock SCC holds the dashboard speed at the set speed.

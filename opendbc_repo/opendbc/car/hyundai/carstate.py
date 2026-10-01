@@ -6,9 +6,10 @@ import math
 # hkg-angle-steering-2025 branch at cc4b08625. See CREDITS.md and THIRD_PARTY_NOTICES.md.
 from cereal import custom
 from opendbc.can import CANDefine, CANParser
-from opendbc.car import Bus, create_button_events, structs
+from opendbc.car import DT_CTRL, Bus, create_button_events, structs
 from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.hyundai.hyundaicanfd import CanBus
+from opendbc.car.hyundai.navi_events import NaviEvents, navi_events_enabled
 from opendbc.car.hyundai.values import HyundaiFlags, HyundaiStarPilotFlags, HyundaiStarPilotSafetyFlags, CAR, DBC, Buttons, CarControllerParams, \
                                        CANFD_ANGLE_LONGITUDINAL_CAR, CANFD_CORNER_RADAR_BSM_CAR, \
                                        CANFD_ALT_BUTTONS_RESUME_CAR, \
@@ -169,6 +170,13 @@ class CarState(CarStateBase):
     self.stock_adrv_lfahda_raw = b""
     self.stock_adrv_scc_raw = b""
     self.clu_speed_kph = None
+    # Stock-navigation road events (speed bumps / cameras), fed raw frames by interface.update (2026 K8 HEV PE)
+    self.navi_events = NaviEvents() if (CP.carFingerprint == CAR.KIA_K8_HEV_1ST_GEN and CP.openpilotLongitudinalControl and
+                                        CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING and
+                                        not CP.flags & HyundaiFlags.CANFD_LKA_STEERING and navi_events_enabled()) else None
+    self.navi_4be_frames: list[bytes] = []
+    self.navi_4a3_raw = None
+    self.navi_4b4_raw = None
     if CP.carFingerprint in CANFD_ANGLE_LONGITUDINAL_CAR:
       self.hba_icon = 0
       self.main_cruise_on = False
@@ -658,6 +666,14 @@ class CarState(CarStateBase):
 
     fp_ret = custom.StarPilotCarState.new_message()
     fp_ret.dashboardSpeedLimit = calculate_canfd_speed_limit(self.CP, self.FPCP, cp, cp_cam, speed_factor)
+
+    if self.navi_events is not None:
+      self.navi_events.update(ret.vEgo, DT_CTRL, self.navi_4be_frames, self.navi_4a3_raw, self.navi_4b4_raw)
+      self.navi_4be_frames, self.navi_4a3_raw, self.navi_4b4_raw = [], None, None
+      fp_ret.naviCameraSpeed = self.navi_events.camera_speed
+      fp_ret.naviCameraDistance = self.navi_events.camera_distance
+      fp_ret.naviBumpDistance = self.navi_events.bump_distance
+      fp_ret.naviSectionSpeed = self.navi_events.section_speed
 
     if self.CP.flags & HyundaiFlags.EV:
       drive_mode = cp.vl["DRIVE_MODE_EV"]["DRIVE_MODE"]
