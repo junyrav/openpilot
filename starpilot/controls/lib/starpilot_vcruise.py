@@ -53,31 +53,6 @@ NAV_TURN_TARGET_SPEEDS = {
 # in feet); positive = stop later/longer, negative = stop sooner/shorter.
 # Smaller values pull speed down earlier on approach.
 FORCE_STOP_MODEL_APPROACH_DECEL = 0.65
-
-# Stock-navigation road events (2026 K8 HEV PE, starpilotCarState.navi*): reach the camera limit by the camera
-# (announced offsets can be 30-40 m past it) and the bump speed shortly before a speed bump, decelerating gently.
-NAVI_CAMERA_DECEL = 1.0      # m/s^2
-NAVI_CAMERA_MARGIN = 40.0    # m
-NAVI_BUMP_DECEL = 1.0        # m/s^2
-NAVI_BUMP_MARGIN = 15.0      # m
-NAVI_BUMP_SPEED = 25.0 * CV.KPH_TO_MS
-
-
-def get_navi_event_target(fp_car_state) -> float:
-  """Speed cap (m/s, dashboard-speed referenced) from stock-navi cameras / bumps / section zones; 0 = none."""
-  targets = []
-  camera_speed = float(getattr(fp_car_state, "naviCameraSpeed", 0.0) or 0.0)
-  if camera_speed > 0.0:
-    d = max(float(getattr(fp_car_state, "naviCameraDistance", 0.0)) - NAVI_CAMERA_MARGIN, 0.0)
-    targets.append(math.sqrt((camera_speed * CV.KPH_TO_MS) ** 2 + 2.0 * NAVI_CAMERA_DECEL * d))
-  bump_distance = float(getattr(fp_car_state, "naviBumpDistance", -100.0))
-  if bump_distance > -50.0:
-    d = max(bump_distance - NAVI_BUMP_MARGIN, 0.0)
-    targets.append(math.sqrt(NAVI_BUMP_SPEED ** 2 + 2.0 * NAVI_BUMP_DECEL * d))
-  section_speed = float(getattr(fp_car_state, "naviSectionSpeed", 0.0) or 0.0)
-  if section_speed > 0.0:
-    targets.append(section_speed * CV.KPH_TO_MS)
-  return min(targets) if targets else 0.0
 FORCE_STOP_DASH_APPROACH_DECEL = 1.0
 ACTIVATION_M = 100.0      # m — CEM/model path activates when model_length < this. Buys
                           # ~1.8 s more runway inside the position constraint, which is the
@@ -231,7 +206,6 @@ class StarPilotVCruise:
     self.stop_sign_confirmed = False
     self.stop_seen_on_approach_at = None
     self.nav_turn_target = 0.0
-    self.navi_event_target = 0.0
     self._nav_instruction_state_raw = None
     self._nav_instruction_state = {}
     self._applied_slc_control_target = 0.0
@@ -797,9 +771,6 @@ class StarPilotVCruise:
         targets.append(slc_control_target)
       if self.nav_turn_target > 0.0:
         targets.append(self.nav_turn_target)
-      self.navi_event_target = get_navi_event_target(sm["starpilotCarState"])
-      if self.navi_event_target > 0.0:
-        targets.append(self.navi_event_target)
 
       # Far-approach envelope: bleed speed off before commit so the car isn't still at
       # cruise when the kinematic curve takes over. Same vetoes as the activation paths;

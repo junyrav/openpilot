@@ -110,10 +110,6 @@ struct StarPilotCarState @0xf35cc4560bbf6ec2 {
   accelHardCruise @28 :Bool;  # current/releasing accel cruise button came from GM hard-press signal
   decelHardCruise @29 :Bool;  # current/releasing decel cruise button came from GM hard-press signal
   pulseAndGlide @30 :Bool;  # developer-only wheel-button pulse-and-glide mode is enabled
-  naviCameraSpeed @31 :Float32;  # km/h, stock-navi speed camera ahead (0 = none)
-  naviCameraDistance @32 :Float32;  # m to that camera (<= 0 while passing)
-  naviBumpDistance @33 :Float32 = -100;  # m to the next stock-navi speed bump (-100 = none; >= -10 while passing)
-  naviSectionSpeed @34 :Float32;  # km/h, inside a section-enforcement zone (0 = none)
 }
 
 struct StarPilotDeviceState @0xda96579883444c35 {
