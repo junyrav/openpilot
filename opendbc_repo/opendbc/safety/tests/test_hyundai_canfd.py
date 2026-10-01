@@ -606,18 +606,26 @@ class TestHyundaiCanfdLfaAngleMdpsEcho(unittest.TestCase):
     self.safety.safety_fwd_modify_hook(msg)
     return bytes(msg.data[0:24])
 
+  def _mdps_t(self, active, torque, counter=37):
+    return bytes(self.packer.make_can_msg_safety("MDPS", 0, {"LKA_ANGLE_ACTIVE": active, "STEERING_ANGLE": 12.3,
+                                                              "STEERING_COL_TORQUE": torque, "COUNTER": counter}).data[0:24])
+
   def test_echo_only_while_openpilot_owns_lfa(self):
     self.safety.safety_rx_hook(self._adrv_cb(1))
     real = bytes(self._mdps(2).data[0:24])
 
     self.safety.set_controls_allowed(False)
-    self.assertEqual(real, self._fwd(self._mdps(2)))
+    for _ in range(50):
+      self.assertEqual(real, self._fwd(self._mdps(2)))
 
+    # echoed state, stock counter kept, valid checksum; hands-on pulse (+220) on the first 40 of every 1000 frames
     self.safety.set_controls_allowed(True)
-    self.assertEqual(bytes(self._mdps(1).data[0:24]), self._fwd(self._mdps(2)))
+    for i in range(1, 1001):
+      expected = self._mdps_t(1, 15 + 220) if (i % 1000) < 40 else self._mdps_t(1, 15)
+      self.assertEqual(expected, self._fwd(self._mdps(2)), f"frame {i}")
 
     self.safety.safety_rx_hook(self._adrv_cb(2))
-    self.assertEqual(bytes(self._mdps(2, counter=99).data[0:24]), self._fwd(self._mdps(1, counter=99)))
+    self.assertEqual(self._mdps_t(2, 15 + 220, counter=99), self._fwd(self._mdps(1, counter=99)))
 
   def test_no_echo_before_adrv_seen_or_other_frames(self):
     self.safety.set_controls_allowed(True)

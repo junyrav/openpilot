@@ -168,6 +168,7 @@ class CarState(CarStateBase):
     self.stock_adrv_lfa_raw = b""
     self.stock_adrv_lfahda_raw = b""
     self.stock_adrv_scc_raw = b""
+    self.clu_speed_kph = None
     if CP.carFingerprint in CANFD_ANGLE_LONGITUDINAL_CAR:
       self.hba_icon = 0
       self.main_cruise_on = False
@@ -531,6 +532,10 @@ class CarState(CarStateBase):
     )
     ret.standstill = cp.vl["WHEEL_SPEEDS"]["WHL_SpdFLVal"] <= STANDSTILL_THRESHOLD and cp.vl["WHEEL_SPEEDS"]["WHL_SpdFRVal"] <= STANDSTILL_THRESHOLD and \
                      cp.vl["WHEEL_SPEEDS"]["WHL_SpdRLVal"] <= STANDSTILL_THRESHOLD and cp.vl["WHEEL_SPEEDS"]["WHL_SpdRRVal"] <= STANDSTILL_THRESHOLD
+    # LFA-path angle trims (2026 K8 HEV PE): dashboard speed from CRUISE_BUTTONS_ALT, so openpilot holds the speed the
+    # speedometer shows at the set speed, like stock SCC (planner uses max(vEgo, vEgoCluster)).
+    if self.clu_speed_kph is not None:
+      ret.vEgoCluster = self.clu_speed_kph * CV.KPH_TO_MS
 
     ret.steeringRateDeg = cp.vl["STEERING_SENSORS"]["STEERING_RATE"]
     ret.steeringAngleDeg = cp.vl["STEERING_SENSORS"]["STEERING_ANGLE"]

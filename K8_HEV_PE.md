@@ -100,6 +100,13 @@ panda safety: `hyundaiCanfd` + `CANFD_ANGLE_STEERING | CAMERA_SCC | HYBRID_GAS |
   - 계기판으로 보내는 0x162에서 FAULT_LCA 숨김(당근과 동일). **FAULT_FCA(전방충돌방지)는 숨기지 않음** — 계속 뜨면 실제 문제.
   - 운전자 조향 토크/터치 위조(당근의 STEER_TOUCH, +220 토크 주입)는 운전자 감시 우회라 적용하지 않음.
 
+- **2026-10-01 (설정 속도보다 3~4 km/h 빠름, LKAS→AOL, 핸들 터치, panda 펌웨어 변경)**:
+  - 계기판 속도는 실제 바퀴 속도보다 약 2~3 km/h 높게 표시됨(로그: 실제 70.7 → 계기판 73.5). 오픈파일럿은 실제 속도를 설정 속도에 맞춰서
+    계기판에는 더 빠르게 보였음. 0x1AA byte6(0.5 km/h 단위, 당근의 CLU_SPEED와 동일)을 vEgoCluster로 사용 → 순정 SCC처럼 계기판 속도 = 설정 속도.
+  - 첫 부팅 1회: Always On Lateral ON + LKAS 버튼 = AOL 토글(LKASButtonControl 9). AOL은 주행 중(시동 ON) 변경 불가라 부팅 시 적용.
+  - 당근처럼 ADRV가 보는 MDPS 사본에만 10초마다 0.4초간 핸들 토크 +220 추가(오픈파일럿이 조향권을 가질 때만). 오픈파일럿 운전자 모니터링은 그대로.
+    핸들 터치 센서(0x2AF)는 체크섬 방식이 확인되지 않아 건드리지 않음.
+
 ## 당근파일럿 vs StarPilot 차량 인터페이스 비교 (이 차 경로: camera SCC + LFA 각도조향)
 
 | 메시지 | 당근파일럿 | StarPilot K8-HEV-PE (현재) |
@@ -110,10 +117,11 @@ panda safety: `hyundaiCanfd` + `CANFD_ANGLE_STEERING | CAMERA_SCC | HYBRID_GAS |
 | 0x1E0 LFAHDA | 순정 복사 + HDA/LFA 심볼 | 동일 |
 | 0x161/0x162 계기판 | 순정 복사 + HUD 필드, FAULT_LCA/HDA/DAS 숨김 | 순정 복사 + HUD 필드, FAULT_LCA/HDA/DAS/LFA/LSS/DAW/ESS 숨김, FCA 표시 |
 | 0x160 | 순정 통과 | 순정 통과 |
-| **0xEA MDPS → ADRV** | 순정 복사 + LFA2_ACTIVE=ADRV 자신의 값, 주기적 토크 +220 | **ADRV 자신의 값 에코(이번 수정)**, 토크 위조 없음 |
+| **0xEA MDPS → ADRV** | 순정 복사 + LFA2_ACTIVE=ADRV 자신의 값, 주기적 토크 +220 | ADRV 자신의 값 에코 + 주기적 토크 +220 (순정 슬롯·카운터 유지) |
 | 0x175 TCS → ADRV | DriverBraking=0 등 수정해서 교체 | 순정 그대로 |
-| 0x2AF 핸들 터치 → ADRV | 10초마다 터치 위조 | 순정 그대로 (적용 안 함) |
+| 0x2AF 핸들 터치 → ADRV | 10초마다 터치 위조 | 순정 그대로 (체크섬 미확인) |
 | 0x1CF 버튼 → ADRV | 순정 + 메인/LFA/RES 버튼 주입(순정 SCC·LFA를 켜둠) | 순정 그대로 |
+| 계기판 속도(0x1AA) | vEgoCluster로 사용 | vEgoCluster로 사용 (이번 수정) |
 | panda 조향 안전검사 | 주석 처리(꺼짐) | 유지 |
 
 ## 검증 (PC 시뮬레이션)

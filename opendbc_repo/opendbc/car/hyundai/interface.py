@@ -460,6 +460,10 @@ class CarInterface(CarInterfaceBase):
             self.CS.stock_adrv_lfahda_raw = bytes(dat)
           elif address == 0x1a0 and src == cam_bus and len(dat) == 32:
             self.CS.stock_adrv_scc_raw = bytes(dat)
+          elif address == 0x1aa and src == CanBus(self.CP).ECAN and len(dat) >= 9:
+            # dashboard speed: byte 6 in 0.5 km/h (byte 8 = the integer shown, CarrotPilot's CLU_SPEED).
+            # The speedometer reads ~2-3 km/h above wheel speed; stock SCC holds the dashboard speed at the set speed.
+            self.CS.clu_speed_kph = dat[6] * 0.5
     ret, fp_ret = super().update(can_packets, starpilot_toggles)
 
     # When ECU disable was skipped (READY mode boot) or failed, suppress CAN timeout errors.

@@ -123,6 +123,7 @@ static bool hyundai_canfd_lfa_angle_stock_forwarding(void) {
 
 // Latest LFA angle-active state (0xCB byte 3 bits 4-5) commanded by the stock ADRV on bus 2; -1 until seen.
 static int hyundai_canfd_adrv_lfa_angle_active = -1;
+static uint32_t hyundai_canfd_mdps_echo_frames = 0U;
 
 static void hyundai_canfd_rx_all_hook(const CANPacket_t *msg) {
   if (hyundai_canfd_lfa_angle_path() && (msg->bus == 2U) && (msg->addr == 0xcbU) && (GET_LEN(msg) == 24U)) {
@@ -142,6 +143,18 @@ static void hyundai_canfd_fwd_modify_hook(CANPacket_t *msg) {
                     (msg->bus == 0U) && (msg->addr == 0xeaU) && (GET_LEN(msg) == 24U);
   if (echo) {
     msg->data[18] = (uint8_t)((msg->data[18] & 0xFCU) | ((uint32_t)hyundai_canfd_adrv_lfa_angle_active & 0x3U));
+
+    // The ADRV now believes its LFA is steering, so its own hands-on monitor would nag about a system that is not
+    // driving the car. Like CarrotPilot, add a small column-torque pulse (+220 raw for 40 of every 1000 frames,
+    // i.e. 0.4 s every 10 s) to the copy the ADRV sees only. openpilot's driver monitoring is unaffected, and the
+    // panda's own driver-torque checks use the real frame.
+    hyundai_canfd_mdps_echo_frames = (hyundai_canfd_mdps_echo_frames + 1U) % 1000U;
+    if (hyundai_canfd_mdps_echo_frames < 40U) {
+      uint32_t col_torque = ((uint32_t)(msg->data[11] & 0x1FU) << 8U) | (uint32_t)msg->data[10];
+      col_torque = SAFETY_MIN(col_torque + 220U, 0x1FFFU);
+      msg->data[10] = (uint8_t)(col_torque & 0xFFU);
+      msg->data[11] = (uint8_t)((msg->data[11] & 0xE0U) | ((col_torque >> 8U) & 0x1FU));
+    }
     uint32_t checksum = hyundai_common_canfd_compute_checksum(msg);
     msg->data[0] = (uint8_t)(checksum & 0xFFU);
     msg->data[1] = (uint8_t)((checksum >> 8U) & 0xFFU);
@@ -553,6 +566,7 @@ static safety_config hyundai_canfd_init(uint16_t param) {
 
   hyundai_common_init(param);
   hyundai_canfd_adrv_lfa_angle_active = -1;
+  hyundai_canfd_mdps_echo_frames = 0U;
 
   gen_crc_lookup_table_16(0x1021, hyundai_canfd_crc_lut);
   hyundai_canfd_alt_buttons = GET_FLAG(param, HYUNDAI_PARAM_CANFD_ALT_BUTTONS);
