@@ -256,6 +256,11 @@ class CarInterfaceBase(ABC):
 
         if candidate == HYUNDAI.HYUNDAI_ELANTRA_HEV_2024 and CP.openpilotLongitudinalControl:
           fp_ret.flags |= HyundaiStarPilotFlags.MAIN_CRUISE_STATE_TRACKING.value
+        # 2026 K8 HEV PE (LFA-path angle trim, camera SCC): like stock and CarrotPilot, cruise main starts off and is
+        # toggled by the cruise main button, so the cluster shows no cruise icon until the driver turns cruise on.
+        if candidate == HYUNDAI.KIA_K8_HEV_1ST_GEN and CP.openpilotLongitudinalControl and \
+           (CP.flags & HyundaiFlags.CANFD_ANGLE_STEERING) and not (CP.flags & HyundaiFlags.CANFD_LKA_STEERING):
+          fp_ret.flags |= HyundaiStarPilotFlags.MAIN_CRUISE_STATE_TRACKING.value
 
         hyundai_has_lda_button = not (CP.flags & HyundaiFlags.CANFD) and (
           0x391 in fingerprint[0] or

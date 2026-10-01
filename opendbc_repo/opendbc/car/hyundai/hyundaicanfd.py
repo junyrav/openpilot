@@ -428,7 +428,9 @@ def create_lfahda_cluster(packer, CAN, enabled, base_values=None, lfa_icon=None)
 
 def create_ccnc(packer, CAN, openpilot_longitudinal, enabled, hud, left_blinker, right_blinker, msg_161, msg_162, msg_1b5,
                 is_metric, out, main_cruise_enabled, lfa_icon, lead_override=None):
-  for fault in ("FAULT_LSS", "FAULT_HDA", "FAULT_DAS", "FAULT_LFA", "FAULT_DAW", "FAULT_ESS"):
+  # FAULT_LCA: openpilot replaces the stock lane-change path, so the ADRV can latch its service flag (CarrotPilot hides
+  # it too). FAULT_FCA (forward collision / AEB) is deliberately left visible.
+  for fault in ("FAULT_LSS", "FAULT_HDA", "FAULT_DAS", "FAULT_LFA", "FAULT_DAW", "FAULT_ESS", "FAULT_LCA"):
     msg_162[fault] = 0
 
   if msg_161["ALERTS_2"] == 5:
@@ -505,7 +507,7 @@ def create_ccnc(packer, CAN, openpilot_longitudinal, enabled, hud, left_blinker,
 
     cruise_speed = round(out.vCruiseCluster * (1 if is_metric else CV.KPH_TO_MPH))
     msg_161.update({
-      "SETSPEED": 3 if enabled else 1,
+      "SETSPEED": 0 if not main_cruise_enabled else 3 if enabled else 1,
       "SETSPEED_HUD": 0 if not main_cruise_enabled else 2 if enabled else 1,
       "SETSPEED_SPEED": 255 if not main_cruise_enabled else (40 if is_metric else 25) if cruise_speed > (145 if is_metric else 90) else cruise_speed,
       "DISTANCE": hud.leadDistanceBars,

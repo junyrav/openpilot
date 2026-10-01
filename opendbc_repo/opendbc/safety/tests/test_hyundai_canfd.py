@@ -580,6 +580,65 @@ class TestHyundaiCanfdLfaAngleCcncMdpsForwarding(unittest.TestCase):
       self.assertEqual(2, safety.safety_fwd_hook(0, 0x7C4))
 
 
+class TestHyundaiCanfdLfaAngleMdpsEcho(unittest.TestCase):
+  """2026 K8 HEV PE: while openpilot owns 0xCB, the MDPS frame forwarded to the ADRV echoes the ADRV's own
+  LFA angle-active state (stock counter kept, checksum recomputed); otherwise it is forwarded unchanged."""
+  TX_MSGS = []
+  PARAM = HyundaiSafetyFlags.CANFD_ANGLE_STEERING | HyundaiSafetyFlags.CAMERA_SCC | HyundaiSafetyFlags.HYBRID_GAS | \
+          HyundaiSafetyFlags.CCNC | HyundaiSafetyFlags.LONG
+
+  def setUp(self):
+    self.packer = CANPackerSafety("hyundai_canfd_generated")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_safety_hooks(CarParams.SafetyModel.hyundaiCanfd, self.PARAM)
+    self.safety.init_tests()
+
+  def _mdps(self, active, counter=37):
+    return self.packer.make_can_msg_safety("MDPS", 0, {"LKA_ANGLE_ACTIVE": active, "STEERING_ANGLE": 12.3,
+                                                        "STEERING_COL_TORQUE": 15, "COUNTER": counter})
+
+  def _adrv_cb(self, active):
+    dat = bytearray(24)
+    dat[3] = (active & 0x3) << 4
+    return common.make_msg(2, 0xCB, 24, bytes(dat))
+
+  def _fwd(self, msg):
+    self.safety.safety_fwd_modify_hook(msg)
+    return bytes(msg.data[0:24])
+
+  def test_echo_only_while_openpilot_owns_lfa(self):
+    self.safety.safety_rx_hook(self._adrv_cb(1))
+    real = bytes(self._mdps(2).data[0:24])
+
+    self.safety.set_controls_allowed(False)
+    self.assertEqual(real, self._fwd(self._mdps(2)))
+
+    self.safety.set_controls_allowed(True)
+    self.assertEqual(bytes(self._mdps(1).data[0:24]), self._fwd(self._mdps(2)))
+
+    self.safety.safety_rx_hook(self._adrv_cb(2))
+    self.assertEqual(bytes(self._mdps(2, counter=99).data[0:24]), self._fwd(self._mdps(1, counter=99)))
+
+  def test_no_echo_before_adrv_seen_or_other_frames(self):
+    self.safety.set_controls_allowed(True)
+    real = bytes(self._mdps(2).data[0:24])
+    self.assertEqual(real, self._fwd(self._mdps(2)))
+    self.safety.safety_rx_hook(self._adrv_cb(1))
+    # wrong direction (bus 2) and other addresses are untouched
+    msg = self.packer.make_can_msg_safety("MDPS", 2, {"LKA_ANGLE_ACTIVE": 2})
+    before = bytes(msg.data[0:24])
+    self.assertEqual(before, self._fwd(msg))
+
+  def test_no_echo_on_lka_steering_cars(self):
+    self.safety.set_safety_hooks(CarParams.SafetyModel.hyundaiCanfd,
+                                 HyundaiSafetyFlags.CANFD_ANGLE_STEERING | HyundaiSafetyFlags.CANFD_LKA_STEERING)
+    self.safety.init_tests()
+    self.safety.set_controls_allowed(True)
+    self.safety.safety_rx_hook(self._adrv_cb(1))
+    real = bytes(self._mdps(2).data[0:24])
+    self.assertEqual(real, self._fwd(self._mdps(2)))
+
+
 class TestHyundaiCanfdCcncAltButtonResume(unittest.TestCase):
   TX_MSGS = [[0x1AA, 2]]
 

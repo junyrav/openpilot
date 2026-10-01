@@ -121,8 +121,31 @@ static bool hyundai_canfd_lfa_angle_stock_forwarding(void) {
   return hyundai_canfd_lfa_angle_path() && !(aol_allowed || controls_allowed);
 }
 
+// Latest LFA angle-active state (0xCB byte 3 bits 4-5) commanded by the stock ADRV on bus 2; -1 until seen.
+static int hyundai_canfd_adrv_lfa_angle_active = -1;
+
 static void hyundai_canfd_rx_all_hook(const CANPacket_t *msg) {
-  SAFETY_UNUSED(msg);
+  if (hyundai_canfd_lfa_angle_path() && (msg->bus == 2U) && (msg->addr == 0xcbU) && (GET_LEN(msg) == 24U)) {
+    hyundai_canfd_adrv_lfa_angle_active = (int)((msg->data[3] >> 4U) & 0x3U);
+  }
+}
+
+// LFA-path angle trims: while openpilot owns 0xCB, the MDPS follows openpilot instead of the ADRV, so the MDPS
+// angle-active state (0xEA byte 18 bits 0-1) the ADRV receives no longer matches its own 0xCB command. The ADRV
+// treats that as a steering fault and latches FAULT_LFA/LCA/FCA (2026 K8 HEV PE rlogs; LKAS press -> steering error).
+// Like CarrotPilot, echo the ADRV's own state in the forwarded MDPS frame, in the stock frame's slot, so the stock
+// counter and timing are untouched (only the checksum is recomputed). While the stock ADRV drives the MDPS
+// (stock forwarding), the real frame is forwarded unchanged.
+static void hyundai_canfd_fwd_modify_hook(CANPacket_t *msg) {
+  const bool echo = hyundai_canfd_lfa_angle_path() && !hyundai_canfd_lfa_angle_stock_forwarding() &&
+                    (hyundai_canfd_adrv_lfa_angle_active >= 0) &&
+                    (msg->bus == 0U) && (msg->addr == 0xeaU) && (GET_LEN(msg) == 24U);
+  if (echo) {
+    msg->data[18] = (uint8_t)((msg->data[18] & 0xFCU) | ((uint32_t)hyundai_canfd_adrv_lfa_angle_active & 0x3U));
+    uint32_t checksum = hyundai_common_canfd_compute_checksum(msg);
+    msg->data[0] = (uint8_t)(checksum & 0xFFU);
+    msg->data[1] = (uint8_t)((checksum >> 8U) & 0xFFU);
+  }
 }
 
 static bool hyundai_canfd_fwd_hook(int bus_num, int addr) {
@@ -529,6 +552,7 @@ static safety_config hyundai_canfd_init(uint16_t param) {
     {0xEA, 2, 24, .check_relay = true},  /* MDPS support frame */ \
 
   hyundai_common_init(param);
+  hyundai_canfd_adrv_lfa_angle_active = -1;
 
   gen_crc_lookup_table_16(0x1021, hyundai_canfd_crc_lut);
   hyundai_canfd_alt_buttons = GET_FLAG(param, HYUNDAI_PARAM_CANFD_ALT_BUTTONS);
@@ -746,4 +770,5 @@ const safety_hooks hyundai_canfd_hooks = {
   .get_checksum = hyundai_canfd_get_checksum,
   .compute_checksum = hyundai_common_canfd_compute_checksum,
   .fwd = hyundai_canfd_fwd_hook,
+  .fwd_modify = hyundai_canfd_fwd_modify_hook,
 };
